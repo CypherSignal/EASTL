@@ -33,6 +33,7 @@
 int TestExtra();
 int TestUtility();
 int TestTuple();
+int TestTupleNamed();
 int TestMemory();
 int TestFunctional();
 int TestAllocator();

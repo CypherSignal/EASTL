@@ -93,6 +93,7 @@ int EAMain(int argc, char* argv[])
 	testSuite.AddTest("Functional",				TestFunctional);
 	testSuite.AddTest("Utility",				TestUtility);
 	testSuite.AddTest("Tuple",					TestTuple);
+	testSuite.AddTest("TupleNamed",				TestTupleNamed);
 	testSuite.AddTest("Memory",					TestMemory);
 	testSuite.AddTest("Allocator",				TestAllocator);
 	testSuite.AddTest("Random",					TestRandom);
