@@ -21,14 +21,28 @@ int TestTupleNamed()
 
 		tuple_named<
 			tuple_named_tag<int, "someInt"_tn>
-		> intNamed(1);
+			> intNamed(1);
 		EATEST_VERIFY(get<int>(intNamed) == 1);
+		EATEST_VERIFY(get_named<"someInt"_tn>(intNamed) == 1);
+
 		tuple_named<
 			tuple_named_tag<int, "someInt"_tn>,
 			tuple_named_tag<float, "someFloat"_tn>
-		>intFloatNamed(2, 2.0f);
+			>intFloatNamed(2, 2.0f);
 		EATEST_VERIFY(get<int>(intFloatNamed) == 2);
 		EATEST_VERIFY(get<float>(intFloatNamed) == 2.0f);
+		EATEST_VERIFY(get_named<"someInt"_tn>(intFloatNamed) == 2);
+		EATEST_VERIFY(get_named<"someFloat"_tn>(intFloatNamed) == 2);
+
+		tuple_named<
+			tuple_named_tag<int, "someInt"_tn>,
+			tuple_named_tag<int, "someOtherInt"_tn>,
+			tuple_named_tag<int, "anotherInt"_tn>
+		>multipleIntsNamed(1,2,3);
+		EATEST_VERIFY(get_named<"someOtherInt"_tn>(multipleIntsNamed) == 2);
+		EATEST_VERIFY(get_named<"anotherInt"_tn>(multipleIntsNamed) == 3);
+
+
 	}
 
 	return nErrorCount;
