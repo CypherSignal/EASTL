@@ -58,7 +58,7 @@ namespace eastl
 	template <size_t val, typename... Ts, size_t... Ns>
 	struct index_lookup<val, tuple_named_tag<Ts, Ns>...>
 	{
-		static const int index = index_lookup_helper<val, Ns...>::index;
+		static const int index = val > sizeof...(Ts) ? index_lookup_helper<val, Ns...>::index : val;
 	};
 
 	template<typename... Tags>
@@ -73,27 +73,16 @@ namespace eastl
 		{}
 
 		typedef tuple<Ts...> TupleType;
-
-	//private:
-	//	template <typename T, typename... Ts>
-	//	friend T& get_named(tuple<Ts...>& t);
 	};
 	
-	
 	template <size_t I, typename... Tags>
-	auto get_named(tuple_named<Tags...>& t)
+	auto get(tuple_named<Tags...>& t)
 	{
-		return get<index_lookup<I, Tags...>::index>(tuple_named<Tags...>::TupleType(t));
+		return I;
+		//return get<index_lookup<I, Tags...>::index>(tuple_named<Tags...>::TupleType(t));
 	}
 
-
-
-
-
-
 }  // namespace eastl
-
-
 
 #endif  // EASTL_TUPLE_ENABLED
 
