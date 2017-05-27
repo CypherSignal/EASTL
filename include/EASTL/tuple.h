@@ -80,7 +80,8 @@ template <size_t I>
 class tuple_element<I, TupleTypes<>>
 {
 public:
-	static_assert(I != I, "tuple_element index out of range");
+	//static_assert(I != I, "tuple_element index out of range");
+	typedef void type;
 };
 
 template <typename H, typename... Ts>

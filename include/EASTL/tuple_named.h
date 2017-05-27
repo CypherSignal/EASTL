@@ -78,8 +78,7 @@ namespace eastl
 	template <size_t I, typename... Tags>
 	auto get(tuple_named<Tags...>& t)
 	{
-		return I;
-		//return get<index_lookup<I, Tags...>::index>(tuple_named<Tags...>::TupleType(t));
+		return get<index_lookup<I, Tags...>::index>(tuple_named<Tags...>::TupleType(t));
 	}
 
 }  // namespace eastl
