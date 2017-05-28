@@ -82,6 +82,7 @@ int TestOptional();
 int TestAny();
 int TestCharTraits();
 int TestStringView();
+int TestTupleVector();
 
 
 // Now enable warnings as desired.
