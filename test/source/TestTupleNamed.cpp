@@ -31,11 +31,11 @@ int TestTupleNamed()
 		tuple_named<
 			tuple_named_tag<int, "someInt"_tn>,
 			tuple_named_tag<float, "someFloat"_tn>
-			>intFloatNamed(2, 2.0f);
+		>intFloatNamed(2, 1.0f);
 		EATEST_VERIFY(get<int>(intFloatNamed) == 2);
-		EATEST_VERIFY(get<float>(intFloatNamed) == 2.0f);
-		EATEST_VERIFY(get<"someInt"_tn>(intFloatNamed) == 2);
-		EATEST_VERIFY(get<"someFloat"_tn>(intFloatNamed) == 2);
+		EATEST_VERIFY(get<float>(intFloatNamed) == 1.0f);
+		EATEST_VERIFY(get<"someInt"_tn>(intFloatNamed) == get<0>(intFloatNamed));
+		EATEST_VERIFY(get<"someFloat"_tn>(intFloatNamed) == get<1>(intFloatNamed));
 
 		tuple_named<
 			tuple_named_tag<int, "someInt"_tn>,
