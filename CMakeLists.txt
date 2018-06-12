@@ -42,7 +42,12 @@ add_definitions(-DEASTL_OPENSOURCE=1)
 #-------------------------------------------------------------------------------------------
 # Library definition
 #-------------------------------------------------------------------------------------------
-file(GLOB EASTL_SOURCES "source/*.cpp" "include/EASTL/*.h" "doc/EASTL.natvis")
+file(GLOB EASTL_SOURCES "source/*.cpp" "include/EASTL/*.h")
+
+if (MSVC AND (MSVC_VERSION EQUAL "1900" OR MSVC_VERSION GREATER "1900" ))
+    set(EASTL_SOURCES ${EASTL_SOURCES} "doc/EASTL.natvis")
+endif()
+
 add_library(EASTL ${EASTL_SOURCES})
 include_directories("include")
 
