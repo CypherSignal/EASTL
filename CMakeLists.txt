@@ -44,7 +44,7 @@ add_definitions(-DEASTL_OPENSOURCE=1)
 #-------------------------------------------------------------------------------------------
 file(GLOB EASTL_SOURCES "source/*.cpp" "include/EASTL/*.h")
 
-if (MSVC AND (MSVC_VERSION EQUAL "1900" OR MSVC_VERSION GREATER "1900" ))
+if (MSVC AND (NOT MSVC_VERSION LESS "1900") AND (NOT CMAKE_VERSION VERSION_LESS "3.7.0") )
     set(EASTL_SOURCES ${EASTL_SOURCES} "doc/EASTL.natvis")
 endif()
 
