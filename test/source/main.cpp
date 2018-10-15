@@ -140,6 +140,9 @@ int EAMain(int argc, char* argv[])
 	testSuite.AddTest("VectorMap",				TestVectorMap);
 	testSuite.AddTest("VectorSet",				TestVectorSet);
 
+	testSuite.AddTest("StlFixedTupleVector", TestStlFixedTupleVector);
+	testSuite.AddTest("StlTupleVector", TestStlTupleVector);
+
 	nErrorCount += testSuite.Run();
 
 	nErrorCount += EASTLTest_CheckMemory();
