@@ -28,6 +28,8 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-pointer-bool-conversion -Wno-unknown-warning-option")
 endif()
 
+set (CMAKE_CXX_STANDARD 17)
+
 #-------------------------------------------------------------------------------------------
 # Source files
 #-------------------------------------------------------------------------------------------
