@@ -62,9 +62,6 @@ namespace std_tuple_vector
 	#define EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR allocator_type(EASTL_TUPLE_VECTOR_DEFAULT_NAME)
 	#endif
 
-	template<class Iterator>
-	class move_iterator;
-
 namespace TupleVecInternal
 {
 
@@ -332,10 +329,10 @@ struct TupleVecIterCompatible<TupleTypes<Us...>, TupleTypes<Ts...>> :
 // While resolving the tuple is a non-zero operation, it consistently generated better code than the alternative of
 // storing - and harmoniously updating on each modification - a full tuple of pointers to the tupleVec's data
 template <std::size_t... Indices, typename... Ts>
-struct TupleVecIter<std::integer_sequence<std::size_t, Indices...>, Ts...>
+struct TupleVecIter<std::index_sequence<Indices...>, Ts...>
 {
 private:
-	typedef TupleVecIter<std::integer_sequence<std::size_t, Indices...>, Ts...> this_type;
+	typedef TupleVecIter<std::index_sequence<Indices...>, Ts...> this_type;
 	typedef std::size_t size_type;
 
 	template<typename U, typename... Us> 
@@ -345,7 +342,7 @@ private:
 	friend class TupleVecImpl;
 
 	template<typename U>
-	friend class move_iterator;
+	friend class std::move_iterator;
 public:
 	typedef std::random_access_iterator_tag iterator_category;
 	typedef std::tuple<Ts...> value_type;
@@ -447,10 +444,10 @@ private:
 
 // TupleVecImpl
 template <typename Allocator, std::size_t... Indices, typename... Ts>
-class TupleVecImpl<Allocator, std::integer_sequence<std::size_t, Indices...>, Ts...> : public TupleVecLeaf<Indices, Ts>...
+class TupleVecImpl<Allocator, std::index_sequence<Indices...>, Ts...> : public TupleVecLeaf<Indices, Ts>...
 {
 	typedef Allocator	allocator_type;
-	typedef std::integer_sequence<std::size_t, Indices...> index_sequence_type;
+	typedef std::index_sequence<Indices...> index_sequence_type;
 	typedef TupleVecImpl<Allocator, index_sequence_type, Ts...> this_type;
 	typedef TupleVecImpl<Allocator, index_sequence_type, const Ts...> const_this_type;
 
@@ -509,7 +506,7 @@ public:
 	}
 
 	template<typename MoveIterBase>
-	TupleVecImpl(move_iterator<MoveIterBase> begin, move_iterator<MoveIterBase> end, const allocator_type& allocator = EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(std::move_iterator<MoveIterBase> begin, std::move_iterator<MoveIterBase> end, const allocator_type& allocator = EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitFromIterator(begin, end);
@@ -1013,7 +1010,7 @@ public:
 
 	void shrink_to_fit()
 	{
-		this_type temp(std_tuple_vector::move_iterator<iterator>(begin()), std_tuple_vector::move_iterator<iterator>(end()), internalAllocator());
+		this_type temp(std::move_iterator<iterator>(begin()),std::move_iterator<iterator>(end()), internalAllocator());
 		swap(temp);
 	}
 
@@ -1266,7 +1263,7 @@ protected:
 	friend struct TupleRecurser;
 
 	template <typename MoveIterBase>
-	void DoInitFromIterator(move_iterator<MoveIterBase> begin, move_iterator<MoveIterBase> end)
+	void DoInitFromIterator(std::move_iterator<MoveIterBase> begin, std::move_iterator<MoveIterBase> end)
 	{
 #if EASTL_ASSERT_ENABLED
 		if (EASTL_UNLIKELY(!validate_iterator_pair(begin.base(), end.base())))
@@ -1386,127 +1383,51 @@ protected:
 
 }  // namespace TupleVecInternal
 
-// Move_iterator specialization for TupleVecIter.
-// An rvalue reference of a move_iterator would normaly be "tuple<Ts...> &&" whereas
-// what we actually want is "tuple<Ts&&...>". This specialization gives us that.
-template <std::size_t... Indices, typename... Ts>
-class move_iterator<TupleVecInternal::TupleVecIter<std::integer_sequence<std::size_t, Indices...>, Ts...>>
-{
-public:
-	typedef TupleVecInternal::TupleVecIter<std::integer_sequence<std::size_t, Indices...>, Ts...> iterator_type;
-	typedef iterator_type wrapped_iterator_type; // This is not in the C++ Standard; it's used by use to identify it as
-												 // a wrapping iterator type.
-	typedef std::iterator_traits<iterator_type> traits_type;
-	typedef typename traits_type::iterator_category iterator_category;
-	typedef typename traits_type::value_type value_type;
-	typedef typename traits_type::difference_type difference_type;
-	typedef typename traits_type::pointer pointer;
-	typedef std::tuple<Ts&&...> reference;
-	typedef move_iterator<iterator_type> this_type;
-
-protected:
-	iterator_type mIterator;
-
-public:
-	move_iterator() : mIterator() {}
-	explicit move_iterator(iterator_type mi) : mIterator(mi) {}
-
-	template <typename U>
-	move_iterator(const move_iterator<U>& mi) : mIterator(mi.base()) {}
-
-	iterator_type base() const { return mIterator; }
-	reference operator*() const { return std::move(MakeReference()); }
-	pointer operator->() const { return mIterator; }
-
-	this_type& operator++() { ++mIterator; return *this; }
-	this_type operator++(int) {
-		this_type tempMoveIterator = *this;
-		++mIterator;
-		return tempMoveIterator;
-	}
-
-	this_type& operator--() { --mIterator; return *this; }
-	this_type operator--(int)
-	{
-		this_type tempMoveIterator = *this;
-		--mIterator;
-		return tempMoveIterator;
-	}
-
-	this_type operator+(difference_type n) const { return move_iterator(mIterator + n); }
-	this_type& operator+=(difference_type n)
-	{
-		mIterator += n;
-		return *this;
-	}
-
-	this_type operator-(difference_type n) const { return move_iterator(mIterator - n); }
-	this_type& operator-=(difference_type n)
-	{
-		mIterator -= n;
-		return *this;
-	}
-
-	difference_type operator-(const this_type& rhs) const { return mIterator.mIndex - rhs.mIterator.mIndex; }
-	bool operator<(const this_type& rhs) const { return mIterator.mIndex < rhs.mIterator.mIndex; }
-	bool operator>(const this_type& rhs) const { return mIterator.mIndex > rhs.mIterator.mIndex; }
-	bool operator>=(const this_type& rhs) const { return mIterator.mIndex >= rhs.mIterator.mIndex; }
-	bool operator<=(const this_type& rhs) const { return mIterator.mIndex <= rhs.mIterator.mIndex; }
-
-	reference operator[](difference_type n) const { return *(*this + n); }
-
-private:
-	reference MakeReference() const 
-	{
-		return reference(std::move(((Ts*)mIterator.mpData[Indices])[mIterator.mIndex])...);
-	}
-};
-
-template <typename AllocatorA, typename AllocatorB, typename... Ts>
-inline bool operator==(const TupleVecInternal::TupleVecImpl<AllocatorA, std::make_index_sequence<sizeof...(Ts)>, Ts...>& a,
-					   const TupleVecInternal::TupleVecImpl<AllocatorB, std::make_index_sequence<sizeof...(Ts)>, Ts...>& b)
+template <typename AllocatorA, typename AllocatorB, typename Indices, typename... Ts>
+inline bool operator==(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
+					   const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return ((a.size() == b.size()) && equal(a.begin(), a.end(), b.begin()));
 }
 
-template <typename AllocatorA, typename AllocatorB,  typename... Ts>
-inline bool operator!=(const TupleVecInternal::TupleVecImpl<AllocatorA, std::make_index_sequence<sizeof...(Ts)>, Ts...>& a,
-					   const TupleVecInternal::TupleVecImpl<AllocatorB, std::make_index_sequence<sizeof...(Ts)>, Ts...>& b)
+template <typename AllocatorA, typename AllocatorB, typename Indices,  typename... Ts>
+inline bool operator!=(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
+					   const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return ((a.size() != b.size()) || !equal(a.begin(), a.end(), b.begin()));
 }
 
-template <typename AllocatorA, typename AllocatorB, typename... Ts>
-inline bool operator<(const TupleVecInternal::TupleVecImpl<AllocatorA, std::make_index_sequence<sizeof...(Ts)>, Ts...>& a,
-					  const TupleVecInternal::TupleVecImpl<AllocatorB, std::make_index_sequence<sizeof...(Ts)>, Ts...>& b)
+template <typename AllocatorA, typename AllocatorB, typename Indices,  typename... Ts>
+inline bool operator<(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
+					  const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
 }
 
-template <typename AllocatorA, typename AllocatorB, typename... Ts>
-inline bool operator>(const TupleVecInternal::TupleVecImpl<AllocatorA, std::make_index_sequence<sizeof...(Ts)>, Ts...>& a,
-					  const TupleVecInternal::TupleVecImpl<AllocatorB, std::make_index_sequence<sizeof...(Ts)>, Ts...>& b)
+template <typename AllocatorA, typename AllocatorB, typename Indices,   typename... Ts>
+inline bool operator>(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
+					  const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return b < a;
 }
 
-template <typename AllocatorA, typename AllocatorB, typename... Ts>
-inline bool operator<=(const TupleVecInternal::TupleVecImpl<AllocatorA, std::make_index_sequence<sizeof...(Ts)>, Ts...>& a,
-					   const TupleVecInternal::TupleVecImpl<AllocatorB, std::make_index_sequence<sizeof...(Ts)>, Ts...>& b)
+template <typename AllocatorA, typename AllocatorB,typename Indices,   typename... Ts>
+inline bool operator<=(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
+					   const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return !(b < a);
 }
 
-template <typename AllocatorA, typename AllocatorB, typename... Ts>
-inline bool operator>=(const TupleVecInternal::TupleVecImpl<AllocatorA, std::make_index_sequence<sizeof...(Ts)>, Ts...>& a,
-					   const TupleVecInternal::TupleVecImpl<AllocatorB, std::make_index_sequence<sizeof...(Ts)>, Ts...>& b)
+template <typename AllocatorA, typename AllocatorB,typename Indices,   typename... Ts>
+inline bool operator>=(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
+					   const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return !(a < b);
 }
 
-template <typename AllocatorA, typename AllocatorB, typename... Ts>
-inline void swap(TupleVecInternal::TupleVecImpl<AllocatorA, std::make_index_sequence<sizeof...(Ts)>, Ts...>& a,
-				TupleVecInternal::TupleVecImpl<AllocatorB, std::make_index_sequence<sizeof...(Ts)>, Ts...>& b)
+template <typename AllocatorA, typename AllocatorB,typename Indices,   typename... Ts>
+inline void swap(TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
+				TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	a.swap(b);
 }
@@ -1547,5 +1468,86 @@ public:
 };
 
 }  // namespace stl_tuple_vector
+
+namespace std
+{
+	using namespace std_tuple_vector;
+
+	// Move_iterator specialization for TupleVecIter.
+	// An rvalue reference of a move_iterator would normaly be "tuple<Ts...> &&" whereas
+	// what we actually want is "tuple<Ts&&...>". This specialization gives us that.
+	template <std::size_t... Indices, typename... Ts>
+	class move_iterator<TupleVecInternal::TupleVecIter<std::index_sequence<Indices...>, Ts...>>
+	{
+	public:
+		typedef TupleVecInternal::TupleVecIter<std::integer_sequence<std::size_t, Indices...>, Ts...> iterator_type;
+		typedef iterator_type wrapped_iterator_type; // This is not in the C++ Standard; it's used by use to identify it as
+													 // a wrapping iterator type.
+		typedef std::iterator_traits<iterator_type> traits_type;
+		typedef typename traits_type::iterator_category iterator_category;
+		typedef typename traits_type::value_type value_type;
+		typedef typename traits_type::difference_type difference_type;
+		typedef typename traits_type::pointer pointer;
+		typedef std::tuple<Ts&&...> reference;
+		typedef move_iterator<iterator_type> this_type;
+
+	protected:
+		iterator_type mIterator;
+
+	public:
+		move_iterator() : mIterator() {}
+		explicit move_iterator(iterator_type mi) : mIterator(mi) {}
+
+		template <typename U>
+		move_iterator(const move_iterator<U>& mi) : mIterator(mi.base()) {}
+
+		iterator_type base() const { return mIterator; }
+		reference operator*() const { return std::move(MakeReference()); }
+		pointer operator->() const { return mIterator; }
+
+		this_type& operator++() { ++mIterator; return *this; }
+		this_type operator++(int) {
+			this_type tempMoveIterator = *this;
+			++mIterator;
+			return tempMoveIterator;
+		}
+
+		this_type& operator--() { --mIterator; return *this; }
+		this_type operator--(int)
+		{
+			this_type tempMoveIterator = *this;
+			--mIterator;
+			return tempMoveIterator;
+		}
+
+		this_type operator+(difference_type n) const { return move_iterator(mIterator + n); }
+		this_type& operator+=(difference_type n)
+		{
+			mIterator += n;
+			return *this;
+		}
+
+		this_type operator-(difference_type n) const { return move_iterator(mIterator - n); }
+		this_type& operator-=(difference_type n)
+		{
+			mIterator -= n;
+			return *this;
+		}
+
+		difference_type operator-(const this_type& rhs) const { return mIterator.mIndex - rhs.mIterator.mIndex; }
+		bool operator<(const this_type& rhs) const { return mIterator.mIndex < rhs.mIterator.mIndex; }
+		bool operator>(const this_type& rhs) const { return mIterator.mIndex > rhs.mIterator.mIndex; }
+		bool operator>=(const this_type& rhs) const { return mIterator.mIndex >= rhs.mIterator.mIndex; }
+		bool operator<=(const this_type& rhs) const { return mIterator.mIndex <= rhs.mIterator.mIndex; }
+
+		reference operator[](difference_type n) const { return *(*this + n); }
+
+	private:
+		reference MakeReference() const
+		{
+			return reference(std::move(((Ts*)mIterator.mpData[Indices])[mIterator.mIndex])...);
+		}
+	};
+}
 
 #endif  // STL_TUPLEVECTOR_H

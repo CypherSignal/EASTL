@@ -13,8 +13,6 @@
 using namespace std;
 using namespace std_tuple_vector;
 
-#define FIXME_REGION 0
-
 int TestStlTupleVector()
 {
 	int nErrorCount = 0;
@@ -1046,9 +1044,10 @@ int TestStlTupleVector()
 			EATEST_VERIFY(ctorFromFill.validate());
 			for (int i = 0; i < 10; ++i)
 			{
-				EATEST_VERIFY(ctorFromFill.get<0>()[i] == false);
+				// int/float have indeterminate default-ctor, so don't check those
+				//EATEST_VERIFY(ctorFromFill.get<0>()[i] == false);
 				EATEST_VERIFY(ctorFromFill.get<1>()[i] == TestObject());
-				EATEST_VERIFY(ctorFromFill.get<2>()[i] == 0.0f);
+				//EATEST_VERIFY(ctorFromFill.get<2>()[i] == 0.0f);
 			}
 		}
 
@@ -1080,18 +1079,16 @@ int TestStlTupleVector()
 		}
 
 		// ctor tuple_Vector with custom mallocator
-#if FIXME_REGION
 		{
 			tuple_vector_alloc<MallocAllocator, bool, TestObject, float> ctorWithAlloc(ma);
 			tuple_vector<bool, TestObject, float> ctorDefault;
 
-			ctorWithAlloc.push_back();
-			ctorDefault.push_back();
-
+			ctorWithAlloc.push_back(false, TestObject(0), 0.0f);
+			ctorDefault.push_back(false, TestObject(0), 0.0f);
+			
 			EATEST_VERIFY(ctorWithAlloc == ctorDefault);
 			EATEST_VERIFY(ctorWithAlloc.validate());
 		}
-#endif
 
 		// ctor tuple_vector_alloc with copy (from diff. allocator)
 		{
@@ -1179,7 +1176,6 @@ int TestStlTupleVector()
 		}
 
 		// ctor tuple_vector via move-iters
-#if FIXME_REGION
 		{
 			tuple_vector<int, MoveOnlyType, TestObject> srcMoveVec;
 			for (int i = 0; i < 10; ++i)
@@ -1218,7 +1214,6 @@ int TestStlTupleVector()
 				EATEST_VERIFY(srcMoveVec.get<2>()[i] == TestObject(i));
 			}
 		}
-#endif
 		srcVec.clear();
 		EATEST_VERIFY(TestObject::IsClear());
 
@@ -1471,7 +1466,6 @@ int TestStlTupleVector()
 	}
 
 	// Test comparisons
-#if FIXME_REGION
 	{
 		MallocAllocator ma;
 		tuple_vector<bool, TestObject, float> equalsVec1, equalsVec2;
@@ -1499,7 +1493,6 @@ int TestStlTupleVector()
 		EATEST_VERIFY(equalsVec1 <= equalsVec2);
 		EATEST_VERIFY(equalsVec1 >= equalsVec2);
 	}
-#endif
 
 	// Test partition
 	{
