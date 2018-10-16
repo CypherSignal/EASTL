@@ -27,19 +27,15 @@
 #ifndef STL_TUPLEVECTOR_H
 #define STL_TUPLEVECTOR_H
 
+#pragma once // Some compilers (e.g. VC++) benefit significantly from using this. We've measured 3-4% build speed improvements in apps as a result.
+
 #include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <memory>
 #include <tuple>
 #include <type_traits>
 #include <utility>
-
-
-#include <EASTL/internal/config.h>
-
-#if defined(EA_PRAGMA_ONCE_SUPPORTED)
-	#pragma once // Some compilers (e.g. VC++) benefit significantly from using this. We've measured 3-4% build speed improvements in apps as a result.
-#endif
 
 namespace std_tuple_vector
 {
@@ -51,6 +47,24 @@ namespace std_tuple_vector
 
 namespace TupleVecInternal
 {
+
+	/// iterator_status_flag
+	/// 
+	/// Defines the validity status of an iterator. This is primarily used for 
+	/// iterator validation in debug builds. These are implemented as OR-able 
+	/// flags (as opposed to mutually exclusive values) in order to deal with 
+	/// the nature of iterator status. In particular, an iterator may be valid
+	/// but not dereferencable, as in the case with an iterator to container end().
+	/// An iterator may be valid but also dereferencable, as in the case with an
+	/// iterator to container begin().
+	///
+	enum iterator_status_flag
+	{
+		isf_none = 0x00, /// This is called none and not called invalid because it is not strictly the opposite of invalid.
+		isf_valid = 0x01, /// The iterator is valid, which means it is in the range of [begin, end].
+		isf_current = 0x02, /// The iterator is valid and points to the same element it did when created. For example, if an iterator points to vector::begin() but an element is inserted at the front, the iterator is valid but not current. Modification of elements in place do not make iterators non-current.
+		isf_can_dereference = 0x04  /// The iterator is dereferencable, which means it is in the range of [begin, end). It may or may not be current.
+	};
 
 // forward declarations
 template <std::size_t I, typename... Ts>
@@ -143,12 +157,12 @@ struct TupleRecurser<>
 	// and provide some other utilities
 	TupleRecurser() = delete;
 		
-	static EA_CONSTEXPR size_type GetTotalAlignment()
+	static constexpr size_type GetTotalAlignment()
 	{
 		return 0;
 	}
 
-	static EA_CONSTEXPR size_type GetTotalAllocationSize(size_type capacity, size_type offset)
+	static constexpr size_type GetTotalAllocationSize(size_type capacity, size_type offset)
 	{
 		return offset;
 	}
@@ -173,12 +187,12 @@ struct TupleRecurser<T, Ts...> : TupleRecurser<Ts...>
 {
 	typedef std::size_t size_type;
 	
-	static EA_CONSTEXPR size_type GetTotalAlignment()
+	static constexpr size_type GetTotalAlignment()
 	{
 		return max(alignof(T), TupleRecurser<Ts...>::GetTotalAlignment());
 	}
 
-	static EA_CONSTEXPR size_type GetTotalAllocationSize(size_type capacity, size_type offset)
+	static constexpr size_type GetTotalAllocationSize(size_type capacity, size_type offset)
 	{
 		return TupleRecurser<Ts...>::GetTotalAllocationSize(capacity, CalculateAllocationSize(offset, capacity));
 	}
@@ -204,12 +218,12 @@ struct TupleRecurser<T, Ts...> : TupleRecurser<Ts...>
 	}
 
 private:
-	static EA_CONSTEXPR size_type CalculateAllocationSize(size_type offset, size_type capacity)
+	static constexpr size_type CalculateAllocationSize(size_type offset, size_type capacity)
 	{
 		return CalculatAllocationOffset(offset) + sizeof(T) * capacity;
 	}
 
-	static EA_CONSTEXPR std::size_t CalculatAllocationOffset(std::size_t offset) { return (offset + alignof(T) - 1) & (~alignof(T) + 1); }
+	static constexpr std::size_t CalculatAllocationOffset(std::size_t offset) { return (offset + alignof(T) - 1) & (~alignof(T) + 1); }
 };
 
 template <std::size_t I, typename T>
@@ -581,10 +595,7 @@ public:
 
 	void assign(const_iterator first, const_iterator last)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(!validate_iterator_pair(first, last)))
-			EASTL_FAIL_MSG("tuple_vector::assign -- invalid iterator pair");
-#endif
+		assert(validate_iterator_pair(first, last));
 		size_type newNumElements = last - first;
 		if (newNumElements > mNumCapacity)
 		{
@@ -618,10 +629,7 @@ public:
 
 	void assign(const value_tuple* first, const value_tuple* last)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(first > last || first == nullptr || last == nullptr))
-			EASTL_FAIL_MSG("tuple_vector::assign from tuple array -- invalid ptrs");
-#endif
+		assert(first <= last && first != nullptr && last != nullptr);
 		size_type newNumElements = last - first;
 		if (newNumElements > mNumCapacity)
 		{
@@ -689,10 +697,7 @@ public:
 
 	iterator emplace(const_iterator pos, Ts&&... args)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(validate_iterator(pos) == eastl::isf_none))
-			EASTL_FAIL_MSG("tuple_vector::emplace -- invalid iterator");
-#endif
+		assert(validate_iterator(pos) != isf_none);
 		size_type firstIdx = pos - cbegin();
 		size_type oldNumElements = mNumElements;
 		size_type newNumElements = mNumElements + 1;
@@ -734,10 +739,7 @@ public:
 
 	iterator insert(const_iterator pos, size_type n, const Ts&... args)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(validate_iterator(pos) == eastl::isf_none))
-			EASTL_FAIL_MSG("tuple_vector::insert -- invalid iterator");
-#endif
+		assert(validate_iterator(pos) != isf_none);
 		size_type firstIdx = pos - cbegin();
 		size_type lastIdx = firstIdx + n;
 		size_type oldNumElements = mNumElements;
@@ -781,12 +783,8 @@ public:
 
 	iterator insert(const_iterator pos, const_iterator first, const_iterator last)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(validate_iterator(pos) == eastl::isf_none))
-			EASTL_FAIL_MSG("tuple_vector::insert -- invalid iterator");
-		if (EASTL_UNLIKELY(!validate_iterator_pair(first, last)))
-			EASTL_FAIL_MSG("tuple_vector::insert -- invalid iterator pair");
-#endif
+		assert(validate_iterator(pos) != isf_none);
+		assert(validate_iterator_pair(first, last));
 		size_type posIdx = pos - cbegin();
 		size_type firstIdx = first.mIndex;
 		size_type lastIdx = last.mIndex;
@@ -838,12 +836,8 @@ public:
 
 	iterator insert(const_iterator pos, const value_tuple* first, const value_tuple* last)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(validate_iterator(pos) == eastl::isf_none))
-			EASTL_FAIL_MSG("tuple_vector::insert -- invalid iterator");
-		if (EASTL_UNLIKELY(first > last || first == nullptr || last == nullptr))
-			EASTL_FAIL_MSG("tuple_vector::insert -- invalid source pointers");
-#endif
+		assert(validate_iterator(pos) != isf_none);
+		assert(first <= last && first != nullptr && last != nullptr);
 		size_type posIdx = pos - cbegin();
 		size_type numToInsert = last - first;
 		size_type oldNumElements = mNumElements;
@@ -910,12 +904,8 @@ public:
 
 	iterator erase(const_iterator first, const_iterator last)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(validate_iterator(first) == eastl::isf_none || validate_iterator(last) == eastl::isf_none))
-			EASTL_FAIL_MSG("tuple_vector::erase -- invalid iterator");
-		if (EASTL_UNLIKELY(!validate_iterator_pair(first, last)))
-			EASTL_FAIL_MSG("tuple_vector::erase -- invalid iterator pair");
-#endif
+		assert(validate_iterator(first) != isf_none && validate_iterator(last) != isf_none);
+		assert(validate_iterator_pair(first, last));
 		if (first != last)
 		{
 			size_type firstIdx = first - cbegin();
@@ -934,10 +924,7 @@ public:
 	
 	iterator erase_unsorted(const_iterator pos)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(validate_iterator(pos) == eastl::isf_none))
-			EASTL_FAIL_MSG("tuple_vector::erase_unsorted -- invalid iterator");
-#endif
+		assert(validate_iterator(pos) != isf_none);
 		size_type oldNumElements = mNumElements;
 		size_type newNumElements = oldNumElements - 1;
 		mNumElements = newNumElements;
@@ -1001,7 +988,7 @@ public:
 		swap(temp);
 	}
 
-	void clear() EA_NOEXCEPT
+	void clear() noexcept
 	{
 		size_type oldNumElements = mNumElements;
 		mNumElements = 0;
@@ -1010,10 +997,7 @@ public:
 
 	void pop_back()
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(mNumElements <= 0))
-			EASTL_FAIL_MSG("tuple_vector::pop_back -- container is empty");
-#endif
+		assert(mNumElements > 0);
 		size_type oldNumElements = mNumElements--;
 		swallow((std::destroy(TupleVecLeaf<Indices, Ts>::mpData + oldNumElements - 1,
 				           TupleVecLeaf<Indices, Ts>::mpData + oldNumElements), 0)...);
@@ -1053,50 +1037,38 @@ public:
 
 	void resize(size_type n, const_reference_tuple tup) { resize(n, std::get<Indices>(tup)...); }
 
-	bool empty() const EA_NOEXCEPT { return mNumElements == 0; }
-	size_type size() const EA_NOEXCEPT { return mNumElements; }
-	size_type capacity() const EA_NOEXCEPT { return mNumCapacity; }
+	bool empty() const noexcept { return mNumElements == 0; }
+	size_type size() const noexcept { return mNumElements; }
+	size_type capacity() const noexcept { return mNumCapacity; }
 
-	iterator begin() EA_NOEXCEPT { return iterator(this, 0); }
-	const_iterator begin() const EA_NOEXCEPT { return const_iterator((const_this_type*)(this), 0); }
-	const_iterator cbegin() const EA_NOEXCEPT { return const_iterator((const_this_type*)(this), 0); }
+	iterator begin() noexcept { return iterator(this, 0); }
+	const_iterator begin() const noexcept { return const_iterator((const_this_type*)(this), 0); }
+	const_iterator cbegin() const noexcept { return const_iterator((const_this_type*)(this), 0); }
 
-	iterator end() EA_NOEXCEPT { return iterator(this, size()); }
-	const_iterator end() const EA_NOEXCEPT { return const_iterator((const_this_type*)(this), size()); }
-	const_iterator cend() const EA_NOEXCEPT { return const_iterator((const_this_type*)(this), size()); }
+	iterator end() noexcept { return iterator(this, size()); }
+	const_iterator end() const noexcept { return const_iterator((const_this_type*)(this), size()); }
+	const_iterator cend() const noexcept { return const_iterator((const_this_type*)(this), size()); }
 
-	reverse_iterator rbegin() EA_NOEXCEPT { return reverse_iterator(end()); }
-	const_reverse_iterator rbegin() const  EA_NOEXCEPT { return const_reverse_iterator(end()); }
-	const_reverse_iterator crbegin() const EA_NOEXCEPT { return const_reverse_iterator(end()); }
+	reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
+	const_reverse_iterator rbegin() const  noexcept { return const_reverse_iterator(end()); }
+	const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(end()); }
 	
-	reverse_iterator rend() EA_NOEXCEPT { return reverse_iterator(begin()); }
-	const_reverse_iterator rend() const EA_NOEXCEPT { return const_reverse_iterator(begin()); }
-	const_reverse_iterator crend() const EA_NOEXCEPT { return const_reverse_iterator(begin()); }
+	reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
+	const_reverse_iterator rend() const noexcept { return const_reverse_iterator(begin()); }
+	const_reverse_iterator crend() const noexcept { return const_reverse_iterator(begin()); }
 
-	ptr_tuple data() EA_NOEXCEPT { return ptr_tuple(TupleVecLeaf<Indices, Ts>::mpData...); }
-	const_ptr_tuple data() const EA_NOEXCEPT { return const_ptr_tuple(TupleVecLeaf<Indices, Ts>::mpData...); }
+	ptr_tuple data() noexcept { return ptr_tuple(TupleVecLeaf<Indices, Ts>::mpData...); }
+	const_ptr_tuple data() const noexcept { return const_ptr_tuple(TupleVecLeaf<Indices, Ts>::mpData...); }
 
 	reference_tuple at(size_type n) 
 	{ 
-#if EASTL_EXCEPTIONS_ENABLED
-		if (EASTL_UNLIKELY(n >= mNumElements))
-			throw std::out_of_range("tuple_vector::at -- out of range");
-#elif EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(n >= mNumElements))
-			EASTL_FAIL_MSG("tuple_vector::at -- out of range");
-#endif
+		assert(n < mNumElements);
 		return reference_tuple(*(TupleVecLeaf<Indices, Ts>::mpData + n)...); 
 	}
 
 	const_reference_tuple at(size_type n) const
 	{
-#if EASTL_EXCEPTIONS_ENABLED
-		if (EASTL_UNLIKELY(n >= mNumElements))
-			throw std::out_of_range("tuple_vector::at -- out of range");
-#elif EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(n >= mNumElements))
-			EASTL_FAIL_MSG("tuple_vector::at -- out of range");
-#endif
+		assert(n < mNumElements);
 		return const_reference_tuple(*(TupleVecLeaf<Indices, Ts>::mpData + n)...); 
 	}
 	
@@ -1105,45 +1077,25 @@ public:
 	
 	reference_tuple front() 
 	{
-#if EASTL_EMPTY_REFERENCE_ASSERT_ENABLED
-	// We allow the user to reference an empty container.
-#elif EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(mNumElements == 0)) // We don't allow the user to reference an empty container.
-			EASTL_FAIL_MSG("tuple_vector::front -- empty vector");
-#endif
+		assert(mNumElements > 0);
 		return at(0); 
 	}
 
 	const_reference_tuple front() const
 	{
-#if EASTL_EMPTY_REFERENCE_ASSERT_ENABLED
-	// We allow the user to reference an empty container.
-#elif EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(mNumElements == 0)) // We don't allow the user to reference an empty container.
-			EASTL_FAIL_MSG("tuple_vector::front -- empty vector");
-#endif
+		assert(mNumElements > 0);
 		return at(0); 
 	}
 	
 	reference_tuple back() 
 	{
-#if EASTL_EMPTY_REFERENCE_ASSERT_ENABLED
-	// We allow the user to reference an empty container.
-#elif EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(mNumElements == 0)) // We don't allow the user to reference an empty container.
-			EASTL_FAIL_MSG("tuple_vector::back -- empty vector");
-#endif
+		assert(mNumElements > 0);
 		return at(size() - 1); 
 	}
 
 	const_reference_tuple back() const 
 	{
-#if EASTL_EMPTY_REFERENCE_ASSERT_ENABLED
-	// We allow the user to reference an empty container.
-#elif EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(mNumElements == 0)) // We don't allow the user to reference an empty container.
-			EASTL_FAIL_MSG("tuple_vector::back -- empty vector");
-#endif
+		assert(mNumElements > 0);
 		return at(size() - 1); 
 	}
 
@@ -1198,7 +1150,7 @@ public:
 		return *this; 
 	}
 
-	bool validate() const EA_NOEXCEPT
+	bool validate() const noexcept
 	{
 		if (mNumElements > mNumCapacity)
 			return false;
@@ -1210,27 +1162,27 @@ public:
 		return true;
 	}
 
-	int validate_iterator(const_iterator iter) const EA_NOEXCEPT
+	int validate_iterator(const_iterator iter) const noexcept
 	{
 		if (!(variadicAnd(iter.mpData[Indices] == TupleVecLeaf<Indices, Ts>::mpData...)))
-			return eastl::isf_none;
+			return isf_none;
 		if (iter.mIndex < mNumElements)
-			return (eastl::isf_valid | eastl::isf_current | eastl::isf_can_dereference);
+			return (isf_valid | isf_current | isf_can_dereference);
 		if (iter.mIndex <= mNumElements)
-			return (eastl::isf_valid | eastl::isf_current);
-		return eastl::isf_none;
+			return (isf_valid | isf_current);
+		return isf_none;
 	}
 
-	static bool validate_iterator_pair(const_iterator first, const_iterator last) EA_NOEXCEPT
+	static bool validate_iterator_pair(const_iterator first, const_iterator last) noexcept
 	{
 		return (first.mIndex <= last.mIndex) && variadicAnd(first.mpData[Indices] == last.mpData[Indices]...);
 	}
 
 	template <typename Iterator, typename = typename enable_if<is_iterator_wrapper<Iterator>::value, bool>::type>
-	int validate_iterator(Iterator iter) const EA_NOEXCEPT { return validate_iterator(unwrap_iterator(iter)); }
+	int validate_iterator(Iterator iter) const noexcept { return validate_iterator(unwrap_iterator(iter)); }
 
 	template <typename Iterator, typename = typename enable_if<is_iterator_wrapper<Iterator>::value, bool>::type>
-	static bool validate_iterator_pair(Iterator first, Iterator last) EA_NOEXCEPT { return validate_iterator_pair(unwrap_iterator(first), unwrap_iterator(last)); }
+	static bool validate_iterator_pair(Iterator first, Iterator last) noexcept { return validate_iterator_pair(unwrap_iterator(first), unwrap_iterator(last)); }
 
 protected:
 
@@ -1240,10 +1192,10 @@ protected:
 
 	std::pair<size_type, allocator_type> mDataSizeAndAllocator;
 
-	size_type& internalDataSize() EA_NOEXCEPT { return mDataSizeAndAllocator.first; }
-	size_type const& internalDataSize() const EA_NOEXCEPT { return mDataSizeAndAllocator.first; }
-	allocator_type& internalAllocator() EA_NOEXCEPT { return mDataSizeAndAllocator.second; }
-	const allocator_type& internalAllocator() const EA_NOEXCEPT { return mDataSizeAndAllocator.second; }
+	size_type& internalDataSize() noexcept { return mDataSizeAndAllocator.first; }
+	size_type const& internalDataSize() const noexcept { return mDataSizeAndAllocator.first; }
+	allocator_type& internalAllocator() noexcept { return mDataSizeAndAllocator.second; }
+	const allocator_type& internalAllocator() const noexcept { return mDataSizeAndAllocator.second; }
 
 	friend struct TupleRecurser<>;
 	template<typename... Us>
@@ -1252,10 +1204,7 @@ protected:
 	template <typename MoveIterBase>
 	void DoInitFromIterator(std::move_iterator<MoveIterBase> begin, std::move_iterator<MoveIterBase> end)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(!validate_iterator_pair(begin.base(), end.base())))
-			EASTL_FAIL_MSG("tuple_vector::erase -- invalid iterator pair");
-#endif
+		assert(validate_iterator_pair(begin.base(), end.base()));
 		size_type newNumElements = (size_type)(end - begin);
 		const void* ppOtherData[sizeof...(Ts)] = { begin.base().mpData[Indices]... };
 		size_type beginIdx = begin.base().mIndex;
@@ -1269,10 +1218,7 @@ protected:
 
 	void DoInitFromIterator(const_iterator begin, const_iterator end)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(!validate_iterator_pair(begin, end)))
-			EASTL_FAIL_MSG("tuple_vector::erase -- invalid iterator pair");
-#endif
+		assert(validate_iterator_pair(begin, end));
 		size_type newNumElements = (size_type)(end - begin);
 		const void* ppOtherData[sizeof...(Ts)] = { begin.mpData[Indices]... };
 		size_type beginIdx = begin.mIndex;
@@ -1302,10 +1248,7 @@ protected:
 
 	void DoInitFromTupleArray(const value_tuple* first, const value_tuple* last)
 	{
-#if EASTL_ASSERT_ENABLED
-		if (EASTL_UNLIKELY(first > last || first == nullptr || last == nullptr))
-			EASTL_FAIL_MSG("tuple_vector::ctor from tuple array -- invalid ptrs");
-#endif
+		assert(first <= last && first != nullptr && last != nullptr);
 		size_type newNumElements = last - first;
 		DoConditionalReallocate(0, mNumCapacity, newNumElements);
 		mNumElements = newNumElements;
