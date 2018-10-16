@@ -36,10 +36,6 @@
 
 
 #include <EASTL/internal/config.h>
-#include <EASTL/iterator.h>
-#include <EASTL/memory.h>
-#include <EASTL/tuple.h>
-#include <EASTL/utility.h>
 
 #if defined(EA_PRAGMA_ONCE_SUPPORTED)
 	#pragma once // Some compilers (e.g. VC++) benefit significantly from using this. We've measured 3-4% build speed improvements in apps as a result.
@@ -47,19 +43,10 @@
 
 namespace std_tuple_vector
 {
-	/// EASTL_TUPLE_VECTOR_DEFAULT_NAME
+	/// STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR
 	///
-	/// Defines a default container name in the absence of a user-provided name.
-	///
-	#ifndef EASTL_TUPLE_VECTOR_DEFAULT_NAME
-	#define EASTL_TUPLE_VECTOR_DEFAULT_NAME EASTL_DEFAULT_NAME_PREFIX " tuple-vector" // Unless the user overrides something, this is "EASTL tuple-vector".
-	#endif
-
-
-	/// EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR
-	///
-	#ifndef EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR
-	#define EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR allocator_type(EASTL_TUPLE_VECTOR_DEFAULT_NAME)
+	#ifndef STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR
+	#define STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR allocator_type()
 	#endif
 
 namespace TupleVecInternal
@@ -172,7 +159,7 @@ struct TupleRecurser<>
 		// If n is zero, then we allocate no memory and just return NULL. 
 		// This is fine, as our default ctor initializes with NULL pointers. 
 		size_type alignment = TupleRecurser<VecTypes...>::GetTotalAlignment();
-		void* ptr = capacity ? eastl::allocate_memory(vec.internalAllocator(), offset, alignment, 0) : nullptr;
+		void* ptr = capacity ? vec.internalAllocator().allocate(offset) : nullptr; // TODO: alignment
 		return make_pair(ptr, offset);
 	}
 
@@ -465,7 +452,7 @@ public:
 	typedef std::tuple<Ts&&...> rvalue_tuple;
 
 	TupleVecImpl()
-		: mDataSizeAndAllocator(0, EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+		: mDataSizeAndAllocator(0, STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
 	{}
 
 	TupleVecImpl(const allocator_type& allocator)
@@ -506,26 +493,26 @@ public:
 	}
 
 	template<typename MoveIterBase>
-	TupleVecImpl(std::move_iterator<MoveIterBase> begin, std::move_iterator<MoveIterBase> end, const allocator_type& allocator = EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(std::move_iterator<MoveIterBase> begin, std::move_iterator<MoveIterBase> end, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitFromIterator(begin, end);
 	}
 
-	TupleVecImpl(const_iterator begin, const_iterator end, const allocator_type& allocator = EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(const_iterator begin, const_iterator end, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
 		: mDataSizeAndAllocator(0, allocator )
 	{
 		DoInitFromIterator(begin, end);
 	}
 
-	TupleVecImpl(size_type n, const allocator_type& allocator = EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(size_type n, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitDefaultFill(n);
 	}
 
 	TupleVecImpl(size_type n, const Ts&... args) 
-		: mDataSizeAndAllocator(0, EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+		: mDataSizeAndAllocator(0, STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
 	{
 		DoInitFillArgs(n, args...);
 	}
@@ -536,19 +523,19 @@ public:
 		DoInitFillArgs(n, args...);
 	}
 
-	TupleVecImpl(size_type n, const_reference_tuple tup, const allocator_type& allocator = EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(size_type n, const_reference_tuple tup, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitFillTuple(n, tup);
 	}
 
-	TupleVecImpl(const value_tuple* first, const value_tuple* last, const allocator_type& allocator = EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(const value_tuple* first, const value_tuple* last, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitFromTupleArray(first, last);
 	}
 
-	TupleVecImpl(std::initializer_list<value_tuple> iList, const allocator_type& allocator = EASTL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(std::initializer_list<value_tuple> iList, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitFromTupleArray(iList.begin(), iList.end());
@@ -567,7 +554,7 @@ public:
 	{ 
 		swallow((std::destroy(TupleVecLeaf<Indices, Ts>::mpData, TupleVecLeaf<Indices, Ts>::mpData + mNumElements), 0)...);
 		if (mpData)
-			EASTLFree(internalAllocator(), mpData, internalDataSize()); 
+			internalAllocator().deallocate((char*)mpData, internalDataSize()); 
 	}
 
 	void assign(size_type n, const Ts&... args)
@@ -728,7 +715,7 @@ public:
 				swallow(::new ((Ts*)ppNewLeaf[Indices] + firstIdx) Ts(std::forward<Ts>(args))...);
 				swallow(TupleVecLeaf<Indices, Ts>::mpData = (Ts*)ppNewLeaf[Indices]...);
 
-				EASTLFree(internalAllocator(), mpData, internalDataSize());
+				internalAllocator().deallocate((char*)mpData, internalDataSize());
 				mpData = allocation.first;
 				mNumCapacity = newCapacity;
 				internalDataSize() = allocation.second;
@@ -774,7 +761,7 @@ public:
 				swallow((std::uninitialized_fill((Ts*)ppNewLeaf[Indices] + firstIdx, (Ts*)ppNewLeaf[Indices] + lastIdx, args), 0)...);
 				swallow(TupleVecLeaf<Indices, Ts>::mpData = (Ts*)ppNewLeaf[Indices]...);
 		
-				EASTLFree(internalAllocator(), mpData, internalDataSize());
+				internalAllocator().deallocate((char*)mpData, internalDataSize());
 				mpData = allocation.first;
 				mNumCapacity = newCapacity;
 				internalDataSize() = allocation.second;
@@ -828,7 +815,7 @@ public:
 						                       (Ts*)ppNewLeaf[Indices] + posIdx), 0)...);
 				swallow(TupleVecLeaf<Indices, Ts>::mpData = (Ts*)ppNewLeaf[Indices]...);
 				
-				EASTLFree(internalAllocator(), mpData, internalDataSize());
+				internalAllocator().deallocate((char*)mpData, internalDataSize());
 				mpData = allocation.first;
 				mNumCapacity = newCapacity;
 				internalDataSize() = allocation.second;
@@ -883,7 +870,7 @@ public:
 				// Do this after mpData is updated so that we can use new iterators
 				DoUninitializedCopyFromTupleArray(begin() + posIdx, begin() + posIdx + numToInsert, first);
 
-				EASTLFree(internalAllocator(), mpData, internalDataSize());
+				internalAllocator().deallocate((char*)mpData, internalDataSize());
 				mpData = allocation.first;
 				mNumCapacity = newCapacity;
 				internalDataSize() = allocation.second;
@@ -1369,7 +1356,7 @@ protected:
 		swallow((TupleVecLeaf<Indices, Ts>::DoUninitializedMoveAndDestruct(0, oldNumElements, (Ts*)ppNewLeaf[Indices]), 0)...);
 		swallow(TupleVecLeaf<Indices, Ts>::mpData = (Ts*)ppNewLeaf[Indices]...);
 
-		EASTLFree(internalAllocator(), mpData, internalDataSize());
+		internalAllocator().deallocate((char*)mpData, internalDataSize());
 		mpData = allocation.first;
 		mNumCapacity = requiredCapacity;
 		internalDataSize() = allocation.second;
@@ -1434,10 +1421,10 @@ inline void swap(TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
 
 // External interface of tuple_vector
 template <typename... Ts>
-class tuple_vector : public TupleVecInternal::TupleVecImpl<EASTLAllocatorType, std::make_index_sequence<sizeof...(Ts)>, Ts...>
+class tuple_vector : public TupleVecInternal::TupleVecImpl<std::allocator<char>, std::make_index_sequence<sizeof...(Ts)>, Ts...>
 {
 	typedef tuple_vector<Ts...> this_type;
-	typedef TupleVecInternal::TupleVecImpl<EASTLAllocatorType, std::make_index_sequence<sizeof...(Ts)>, Ts...> base_type;
+	typedef TupleVecInternal::TupleVecImpl<std::allocator<char>, std::make_index_sequence<sizeof...(Ts)>, Ts...> base_type;
 	using base_type::base_type;
 
 public:

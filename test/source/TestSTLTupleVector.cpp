@@ -4,11 +4,11 @@
 // Copyright (c) 2018, Electronic Arts Inc. All rights reserved.
 /////////////////////////////////////////////////////////////////////////////
 
-#include "EASTLTest.h"
 
+#include <algorithm>
 #include <STL/tuple_vector.h>
 
-#include <EASTL/sort.h>
+#include "EASTLTest.h"
 
 using namespace std;
 using namespace std_tuple_vector;
