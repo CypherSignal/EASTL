@@ -111,7 +111,7 @@ int TestStlTupleVector()
 
 	// test the memory layouts work for aligned structures
 	{
-		struct EA_ALIGN(16) AlignTestVec4
+		struct alignas(16) AlignTestVec4
 		{
 			float a[4];
 			AlignTestVec4() :a{ 1.0f, 2.0f, 3.0f, 4.0f } {}
@@ -123,7 +123,7 @@ int TestStlTupleVector()
 			AlignTestByte3() :a{ 1, 2, 3 } {}
 		};
 
-		struct EA_ALIGN(8) AlignTestFourByte
+		struct alignas(32) AlignTestFourByte
 		{
 			int a[5];
 			AlignTestFourByte() :a{ -1, -2, -3, -4, -5 } {}
@@ -137,7 +137,7 @@ int TestStlTupleVector()
 		alignElementVec.push_back();
 
 		EATEST_VERIFY((uintptr_t)alignElementVec.get<AlignTestVec4>() % 16 == 0);
-		EATEST_VERIFY((uintptr_t)alignElementVec.get<AlignTestFourByte>() % 8 == 0);
+		EATEST_VERIFY((uintptr_t)alignElementVec.get<AlignTestFourByte>() % 32 == 0);
 	}
 
 	// Test resize and various modifications

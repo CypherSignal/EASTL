@@ -39,11 +39,6 @@
 
 namespace std_tuple_vector
 {
-	/// STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR
-	///
-	#ifndef STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR
-	#define STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR allocator_type()
-	#endif
 
 namespace TupleVecInternal
 {
@@ -173,7 +168,7 @@ struct TupleRecurser<>
 		// If n is zero, then we allocate no memory and just return NULL. 
 		// This is fine, as our default ctor initializes with NULL pointers. 
 		size_type alignment = TupleRecurser<VecTypes...>::GetTotalAlignment();
-		void* ptr = capacity ? vec.internalAllocator().allocate(offset) : nullptr; // TODO: alignment
+		void* ptr = capacity ? vec.internalAllocator().allocate(offset) : nullptr;
 		return make_pair(ptr, offset);
 	}
 
@@ -186,7 +181,7 @@ template <typename T, typename... Ts>
 struct TupleRecurser<T, Ts...> : TupleRecurser<Ts...>
 {
 	typedef std::size_t size_type;
-	
+
 	static constexpr size_type GetTotalAlignment()
 	{
 		return max(alignof(T), TupleRecurser<Ts...>::GetTotalAlignment());
@@ -216,6 +211,11 @@ struct TupleRecurser<T, Ts...> : TupleRecurser<Ts...>
 		vec.TupleVecLeaf<I, T>::mpData = (T*)((uintptr_t)pData + allocationOffset);
 		TupleRecurser<Ts...>::template SetNewData<TupleVecImplType, I + 1>(vec, pData, capacity, allocationSize);
 	}
+
+	struct alignas(GetTotalAlignment()) AlignedData
+	{
+		char data;
+	};
 
 private:
 	static constexpr size_type CalculateAllocationSize(size_type offset, size_type capacity)
@@ -466,7 +466,7 @@ public:
 	typedef std::tuple<Ts&&...> rvalue_tuple;
 
 	TupleVecImpl()
-		: mDataSizeAndAllocator(0, STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+		: mDataSizeAndAllocator(0, allocator_type())
 	{}
 
 	TupleVecImpl(const allocator_type& allocator)
@@ -507,26 +507,26 @@ public:
 	}
 
 	template<typename MoveIterBase>
-	TupleVecImpl(std::move_iterator<MoveIterBase> begin, std::move_iterator<MoveIterBase> end, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(std::move_iterator<MoveIterBase> begin, std::move_iterator<MoveIterBase> end, const allocator_type& allocator = allocator_type())
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitFromIterator(begin, end);
 	}
 
-	TupleVecImpl(const_iterator begin, const_iterator end, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(const_iterator begin, const_iterator end, const allocator_type& allocator = allocator_type())
 		: mDataSizeAndAllocator(0, allocator )
 	{
 		DoInitFromIterator(begin, end);
 	}
 
-	TupleVecImpl(size_type n, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(size_type n, const allocator_type& allocator = allocator_type())
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitDefaultFill(n);
 	}
 
 	TupleVecImpl(size_type n, const Ts&... args) 
-		: mDataSizeAndAllocator(0, STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+		: mDataSizeAndAllocator(0, allocator_type())
 	{
 		DoInitFillArgs(n, args...);
 	}
@@ -537,19 +537,19 @@ public:
 		DoInitFillArgs(n, args...);
 	}
 
-	TupleVecImpl(size_type n, const_reference_tuple tup, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(size_type n, const_reference_tuple tup, const allocator_type& allocator = allocator_type())
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitFillTuple(n, tup);
 	}
 
-	TupleVecImpl(const value_tuple* first, const value_tuple* last, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(const value_tuple* first, const value_tuple* last, const allocator_type& allocator = allocator_type())
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitFromTupleArray(first, last);
 	}
 
-	TupleVecImpl(std::initializer_list<value_tuple> iList, const allocator_type& allocator = STL_TUPLE_VECTOR_DEFAULT_ALLOCATOR)
+	TupleVecImpl(std::initializer_list<value_tuple> iList, const allocator_type& allocator = allocator_type())
 		: mDataSizeAndAllocator(0, allocator)
 	{
 		DoInitFromTupleArray(iList.begin(), iList.end());
@@ -568,7 +568,7 @@ public:
 	{ 
 		swallow((std::destroy(TupleVecLeaf<Indices, Ts>::mpData, TupleVecLeaf<Indices, Ts>::mpData + mNumElements), 0)...);
 		if (mpData)
-			internalAllocator().deallocate((char*)mpData, internalDataSize()); 
+			internalAllocator().deallocate((typename TupleRecurser<Ts...>::AlignedData*)mpData, internalDataSize()); 
 	}
 
 	void assign(size_type n, const Ts&... args)
@@ -710,7 +710,7 @@ public:
 				const size_type newCapacity = std::max(GetNewCapacity(oldNumCapacity), newNumElements);
 
 				void* ppNewLeaf[sizeof...(Ts)];
-				std::pair<void*, size_type> allocation =	TupleRecurser<Ts...>::template DoAllocate<allocator_type, 0, index_sequence_type, Ts...>(
+				std::pair<void*, size_type> allocation = TupleRecurser<Ts...>::template DoAllocate<allocator_type, 0, index_sequence_type, Ts...>(
 					*this, ppNewLeaf, newCapacity, 0);
 
 				swallow((TupleVecLeaf<Indices, Ts>::DoUninitializedMoveAndDestruct(
@@ -720,7 +720,7 @@ public:
 				swallow(::new ((Ts*)ppNewLeaf[Indices] + firstIdx) Ts(std::forward<Ts>(args))...);
 				swallow(TupleVecLeaf<Indices, Ts>::mpData = (Ts*)ppNewLeaf[Indices]...);
 
-				internalAllocator().deallocate((char*)mpData, internalDataSize());
+				internalAllocator().deallocate((typename TupleRecurser<Ts...>::AlignedData*)mpData, internalDataSize());
 				mpData = allocation.first;
 				mNumCapacity = newCapacity;
 				internalDataSize() = allocation.second;
@@ -763,7 +763,7 @@ public:
 				swallow((std::uninitialized_fill((Ts*)ppNewLeaf[Indices] + firstIdx, (Ts*)ppNewLeaf[Indices] + lastIdx, args), 0)...);
 				swallow(TupleVecLeaf<Indices, Ts>::mpData = (Ts*)ppNewLeaf[Indices]...);
 		
-				internalAllocator().deallocate((char*)mpData, internalDataSize());
+				internalAllocator().deallocate((typename TupleRecurser<Ts...>::AlignedData*)mpData, internalDataSize());
 				mpData = allocation.first;
 				mNumCapacity = newCapacity;
 				internalDataSize() = allocation.second;
@@ -813,7 +813,7 @@ public:
 						                       (Ts*)ppNewLeaf[Indices] + posIdx), 0)...);
 				swallow(TupleVecLeaf<Indices, Ts>::mpData = (Ts*)ppNewLeaf[Indices]...);
 				
-				internalAllocator().deallocate((char*)mpData, internalDataSize());
+				internalAllocator().deallocate((typename TupleRecurser<Ts...>::AlignedData*)mpData, internalDataSize());
 				mpData = allocation.first;
 				mNumCapacity = newCapacity;
 				internalDataSize() = allocation.second;
@@ -864,7 +864,7 @@ public:
 				// Do this after mpData is updated so that we can use new iterators
 				DoUninitializedCopyFromTupleArray(begin() + posIdx, begin() + posIdx + numToInsert, first);
 
-				internalAllocator().deallocate((char*)mpData, internalDataSize());
+				internalAllocator().deallocate((typename TupleRecurser<Ts...>::AlignedData*)mpData, internalDataSize());
 				mpData = allocation.first;
 				mNumCapacity = newCapacity;
 				internalDataSize() = allocation.second;
@@ -1299,7 +1299,7 @@ protected:
 		swallow((TupleVecLeaf<Indices, Ts>::DoUninitializedMoveAndDestruct(0, oldNumElements, (Ts*)ppNewLeaf[Indices]), 0)...);
 		swallow(TupleVecLeaf<Indices, Ts>::mpData = (Ts*)ppNewLeaf[Indices]...);
 
-		internalAllocator().deallocate((char*)mpData, internalDataSize());
+		internalAllocator().deallocate((typename TupleRecurser<Ts...>::AlignedData*)mpData, internalDataSize());
 		mpData = allocation.first;
 		mNumCapacity = requiredCapacity;
 		internalDataSize() = allocation.second;
@@ -1320,42 +1320,42 @@ inline bool operator==(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices,
 	return ((a.size() == b.size()) && equal(a.begin(), a.end(), b.begin()));
 }
 
-template <typename AllocatorA, typename AllocatorB, typename Indices,  typename... Ts>
+template <typename AllocatorA, typename AllocatorB, typename Indices, typename... Ts>
 inline bool operator!=(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
 					   const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return ((a.size() != b.size()) || !equal(a.begin(), a.end(), b.begin()));
 }
 
-template <typename AllocatorA, typename AllocatorB, typename Indices,  typename... Ts>
+template <typename AllocatorA, typename AllocatorB, typename Indices, typename... Ts>
 inline bool operator<(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
 					  const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
 }
 
-template <typename AllocatorA, typename AllocatorB, typename Indices,   typename... Ts>
+template <typename AllocatorA, typename AllocatorB, typename Indices, typename... Ts>
 inline bool operator>(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
 					  const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return b < a;
 }
 
-template <typename AllocatorA, typename AllocatorB,typename Indices,   typename... Ts>
+template <typename AllocatorA, typename AllocatorB,typename Indices, typename... Ts>
 inline bool operator<=(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
 					   const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return !(b < a);
 }
 
-template <typename AllocatorA, typename AllocatorB,typename Indices,   typename... Ts>
+template <typename AllocatorA, typename AllocatorB,typename Indices, typename... Ts>
 inline bool operator>=(const TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
 					   const TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
 	return !(a < b);
 }
 
-template <typename AllocatorA, typename AllocatorB,typename Indices,   typename... Ts>
+template <typename AllocatorA, typename AllocatorB,typename Indices, typename... Ts>
 inline void swap(TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
 				TupleVecInternal::TupleVecImpl<AllocatorB, Indices, Ts...>& b)
 {
@@ -1364,10 +1364,14 @@ inline void swap(TupleVecInternal::TupleVecImpl<AllocatorA, Indices, Ts...>& a,
 
 // External interface of tuple_vector
 template <typename... Ts>
-class tuple_vector : public TupleVecInternal::TupleVecImpl<std::allocator<char>, std::make_index_sequence<sizeof...(Ts)>, Ts...>
+class tuple_vector : public TupleVecInternal::TupleVecImpl<
+	std::allocator<typename TupleVecInternal::TupleRecurser<Ts...>::AlignedData>,
+	std::make_index_sequence<sizeof...(Ts)>, Ts...>
 {
 	typedef tuple_vector<Ts...> this_type;
-	typedef TupleVecInternal::TupleVecImpl<std::allocator<char>, std::make_index_sequence<sizeof...(Ts)>, Ts...> base_type;
+	typedef TupleVecInternal::TupleVecImpl<
+		std::allocator<typename TupleVecInternal::TupleRecurser<Ts...>::AlignedData>,
+		std::make_index_sequence<sizeof...(Ts)>, Ts...> base_type;
 	using base_type::base_type;
 
 public:
