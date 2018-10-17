@@ -80,7 +80,6 @@ int TestVectorMap();
 int TestVectorSet();
 int TestTupleVector();
 
-int TestStlFixedTupleVector();
 int TestStlTupleVector();
 
 
