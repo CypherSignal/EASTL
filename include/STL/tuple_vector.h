@@ -124,7 +124,7 @@ template <typename T, typename... TsRest>
 struct tuplevec_index<T, TupleTypes<T, TsRest...>>
 {
 	typedef int DuplicateTypeCheck;
-	static_assert(is_void<typename tuplevec_index<T, TupleTypes<TsRest...>>::DuplicateTypeCheck>::value, "duplicate type T in tuple_vector::get<T>(); unique types must be provided in declaration, or only use get<std::size_t>()");
+	static_assert(std::is_void<typename tuplevec_index<T, TupleTypes<TsRest...>>::DuplicateTypeCheck>::value, "duplicate type T in tuple_vector::get<T>(); unique types must be provided in declaration, or only use get<std::size_t>()");
 
 	static const std::size_t index = 0;
 };
@@ -169,7 +169,7 @@ struct TupleRecurser<>
 		// This is fine, as our default ctor initializes with NULL pointers. 
 		size_type alignment = TupleRecurser<VecTypes...>::GetTotalAlignment();
 		void* ptr = capacity ? vec.internalAllocator().allocate(offset) : nullptr;
-		return make_pair(ptr, offset);
+		return std::make_pair(ptr, offset);
 	}
 
 	template<typename TupleVecImplType, size_type I>
@@ -184,7 +184,7 @@ struct TupleRecurser<T, Ts...> : TupleRecurser<Ts...>
 
 	static constexpr size_type GetTotalAlignment()
 	{
-		return max(alignof(T), TupleRecurser<Ts...>::GetTotalAlignment());
+		return std::max(alignof(T), TupleRecurser<Ts...>::GetTotalAlignment());
 	}
 
 	static constexpr size_type GetTotalAllocationSize(size_type capacity, size_type offset)
@@ -306,7 +306,7 @@ inline bool variadicAnd(bool cond, bool conds...) { return cond && variadicAnd(c
 // Helper struct to check for strict compatibility between two iterators, whilst still allowing for
 // conversion between TupleVecImpl<Ts...>::iterator and TupleVecImpl<Ts...>::const_iterator. 
 template <bool IsSameSize, typename From, typename To>
-struct TupleVecIterCompatibleImpl : public false_type { };
+struct TupleVecIterCompatibleImpl : public std::false_type { };
 	
 template<>
 struct TupleVecIterCompatibleImpl<true, TupleTypes<>, TupleTypes<>> : public std::true_type { };
@@ -360,7 +360,7 @@ public:
 	{ }
 
 	template <typename OtherIndicesType, typename... Us,
-			  typename = typename enable_if<TupleVecIterCompatible<TupleTypes<Us...>, TupleTypes<Ts...>>::value, bool>::type>
+			  typename = typename std::enable_if<TupleVecIterCompatible<TupleTypes<Us...>, TupleTypes<Ts...>>::value, bool>::type>
 	TupleVecIter(const TupleVecIter<OtherIndicesType, Us...>& other)
 		: mIndex(other.mIndex)
 		, mpData{other.mpData[Indices]...}
@@ -750,7 +750,7 @@ public:
 		{
 			if (newNumElements > oldNumCapacity)
 			{
-				const size_type newCapacity = max(GetNewCapacity(oldNumCapacity), newNumElements);
+				const size_type newCapacity = std::max(GetNewCapacity(oldNumCapacity), newNumElements);
 
 				void* ppNewLeaf[sizeof...(Ts)];
 				std::pair<void*, size_type> allocation = TupleRecurser<Ts...>::template DoAllocate<allocator_type, 0, index_sequence_type, Ts...>(
@@ -798,7 +798,7 @@ public:
 		{
 			if (newNumElements > oldNumCapacity)
 			{
-				const size_type newCapacity = max(GetNewCapacity(oldNumCapacity), newNumElements);
+				const size_type newCapacity = std::max(GetNewCapacity(oldNumCapacity), newNumElements);
 
 				void* ppNewLeaf[sizeof...(Ts)];
 				std::pair<void*, size_type> allocation = TupleRecurser<Ts...>::template DoAllocate<allocator_type, 0, index_sequence_type, Ts...>(
@@ -848,7 +848,7 @@ public:
 		{
 			if (newNumElements > oldNumCapacity)
 			{
-				const size_type newCapacity = max(GetNewCapacity(oldNumCapacity), newNumElements);
+				const size_type newCapacity = std::max(GetNewCapacity(oldNumCapacity), newNumElements);
 
 				void* ppNewLeaf[sizeof...(Ts)];
 				std::pair<void*, size_type> allocation = TupleRecurser<Ts...>::template DoAllocate<allocator_type, 0, index_sequence_type, Ts...>(
@@ -1177,12 +1177,6 @@ public:
 	{
 		return (first.mIndex <= last.mIndex) && variadicAnd(first.mpData[Indices] == last.mpData[Indices]...);
 	}
-
-	template <typename Iterator, typename = typename enable_if<is_iterator_wrapper<Iterator>::value, bool>::type>
-	int validate_iterator(Iterator iter) const noexcept { return validate_iterator(unwrap_iterator(iter)); }
-
-	template <typename Iterator, typename = typename enable_if<is_iterator_wrapper<Iterator>::value, bool>::type>
-	static bool validate_iterator_pair(Iterator first, Iterator last) noexcept { return validate_iterator_pair(unwrap_iterator(first), unwrap_iterator(last)); }
 
 protected:
 
