@@ -1476,6 +1476,23 @@ namespace std
 			return reference(std::move(((Ts*)mIterator.mpData[Indices])[mIterator.mIndex])...);
 		}
 	};
+
+	// A customization of swap is made for r-values of tuples-of-references - 
+	// normally, swapping rvalues doesn't make sense, but in this case, we do want to 
+	// swap the contents of what the tuple-of-references are referring to
+	//
+	// This is required due to TupleVecIter returning a value-type for its dereferencing,
+	// as opposed to an actual real reference of some sort
+	template<typename... Ts>
+	typename std::enable_if<std::conjunction<std::is_swappable<Ts>...>::value>::type
+		swap(std::tuple<Ts&...>&& a, std::tuple<Ts&...>&& b)
+	{
+		a.swap(b);
+	}
+
+	template<typename... Ts>
+	typename std::enable_if<!std::conjunction<std::is_swappable<Ts>...>::value>::type
+		swap(std::tuple<Ts&...>&& a, std::tuple<Ts&...>&& b) = delete;
 }
 
 #endif  // STL_TUPLEVECTOR_H
