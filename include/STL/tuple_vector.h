@@ -27,8 +27,6 @@
 #ifndef STL_TUPLEVECTOR_H
 #define STL_TUPLEVECTOR_H
 
-#pragma once // Some compilers (e.g. VC++) benefit significantly from using this. We've measured 3-4% build speed improvements in apps as a result.
-
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
